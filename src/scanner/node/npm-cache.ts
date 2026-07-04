@@ -25,7 +25,7 @@ export class NpmCacheScanner extends BaseScanner {
         [npmCachePath],
         npmSize,
         'safe',
-        '运行 npm cache clean --force 或 npm install 自动重建'
+        '运行 npm install 自动重建'
       ))
     }
 

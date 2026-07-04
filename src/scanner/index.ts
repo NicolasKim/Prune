@@ -1,21 +1,38 @@
 import type { TechStackScanner, CacheItem } from '../shared/types'
 import { NpmCacheScanner } from './node/npm-cache'
+import { NodeExtraCachesScanner } from './node/node-extra-caches'
 import { BrewCacheScanner } from './brew/brew-cache'
 import { DerivedDataScanner } from './xcode/derived-data'
+import { XcodeExtraCachesScanner } from './xcode/xcode-extra-caches'
 import { UvCacheScanner } from './python/uv-cache'
+import { PythonExtraCachesScanner } from './python/python-extra-caches'
 import { GradleCacheScanner } from './java/gradle-cache'
+import { JavaExtraCachesScanner } from './java/java-extra-caches'
 import { RustCacheScanner } from './misc/rust-cache'
 import { GoCacheScanner } from './misc/go-cache'
-// future scanners imported here
+import { MiscExtraCachesScanner } from './misc/misc-extra-caches'
+import { FlutterCacheScanner } from './misc/flutter-caches'
+import { DockerCacheScanner } from './docker/docker-caches'
+import { IdeCachesScanner } from './ide/ide-caches'
+import { SystemCacheScanner } from './system/system-caches'
 
 const scanners: TechStackScanner[] = [
   new NpmCacheScanner(),
+  new NodeExtraCachesScanner(),
   new BrewCacheScanner(),
   new DerivedDataScanner(),
+  new XcodeExtraCachesScanner(),
   new UvCacheScanner(),
+  new PythonExtraCachesScanner(),
   new GradleCacheScanner(),
+  new JavaExtraCachesScanner(),
   new RustCacheScanner(),
-  new GoCacheScanner()
+  new GoCacheScanner(),
+  new MiscExtraCachesScanner(),
+  new FlutterCacheScanner(),
+  new DockerCacheScanner(),
+  new IdeCachesScanner(),
+  new SystemCacheScanner()
 ]
 
 export function getAllScanners(): TechStackScanner[] {

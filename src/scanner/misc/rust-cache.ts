@@ -24,7 +24,7 @@ export class RustCacheScanner extends BaseScanner {
         [rustupDir],
         rustupSize,
         'conditional',
-        'rustup toolchain install stable 重新安装'
+        'rustup toolchain install <toolchain> (或 rustup-init) 重新安装所需工具链'
       ))
     }
 

@@ -25,7 +25,7 @@ export function initDb(): void {
     );
 
     CREATE TABLE IF NOT EXISTS scan_items (
-      id TEXT PRIMARY KEY,
+      id TEXT NOT NULL,
       scan_id TEXT NOT NULL REFERENCES scans(id),
       scanner_id TEXT NOT NULL,
       name TEXT NOT NULL,
@@ -34,13 +34,14 @@ export function initDb(): void {
       risk_level TEXT NOT NULL,
       restore_guide TEXT DEFAULT '',
       selected INTEGER DEFAULT 0,
-      cleaned INTEGER DEFAULT 0
+      cleaned INTEGER DEFAULT 0,
+      PRIMARY KEY (scan_id, id)
     );
 
     CREATE TABLE IF NOT EXISTS backups (
       id TEXT PRIMARY KEY,
-      scan_id TEXT NOT NULL REFERENCES scans(id),
-      item_id TEXT NOT NULL REFERENCES scan_items(id),
+      scan_id TEXT NOT NULL,
+      item_id TEXT NOT NULL,
       original_paths TEXT NOT NULL,
       compressed_path TEXT NOT NULL,
       original_size INTEGER NOT NULL,
@@ -91,6 +92,14 @@ export function getScans(): ScanMeta[] {
   `).all() as ScanMeta[]
 }
 
+export function getScan(scanId: string): ScanMeta | undefined {
+  return getDb().prepare(`
+    SELECT id, started_at AS startedAt, completed_at AS completedAt,
+           total_items AS totalItems, total_bytes AS totalBytes, status
+    FROM scans WHERE id = ?
+  `).get(scanId) as ScanMeta | undefined
+}
+
 export function getScanItems(scanId: string): CacheItemRow[] {
   return getDb().prepare('SELECT * FROM scan_items WHERE scan_id = ?').all(scanId) as CacheItemRow[]
 }
@@ -118,7 +127,7 @@ export function insertBackup(backup: BackupMeta): void {
 }
 
 export function getBackups(): BackupMeta[] {
-  return getDb().prepare(`
+  const rows = getDb().prepare(`
     SELECT b.id, b.scan_id AS scanId, b.item_id AS itemId,
            s.name AS itemName,
            b.original_paths AS originalPaths, b.compressed_path AS compressedPath,
@@ -127,7 +136,11 @@ export function getBackups(): BackupMeta[] {
     FROM backups b
     LEFT JOIN scan_items s ON s.id = b.item_id
     ORDER BY b.created_at DESC
-  `).all() as BackupMeta[]
+  `).all() as Array<Record<string, unknown>>
+  return rows.map(r => ({
+    ...r,
+    originalPaths: typeof r.originalPaths === 'string' ? JSON.parse(r.originalPaths as string) : r.originalPaths
+  })) as BackupMeta[]
 }
 
 export function markBackupRestored(backupId: string): void {

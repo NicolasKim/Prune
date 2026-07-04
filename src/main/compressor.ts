@@ -1,6 +1,6 @@
-import { execFile } from 'child_process'
+import { spawn, execFile } from 'child_process'
 import { createHash } from 'crypto'
-import { createReadStream } from 'fs'
+import { createWriteStream } from 'fs'
 import { unlink, stat } from 'fs/promises'
 import path from 'path'
 import { getBackupDir } from '../shared/constants'
@@ -24,34 +24,41 @@ function runTar(args: string[]): Promise<void> {
   })
 }
 
-function computeSha256(filePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const hash = createHash('sha256')
-    const stream = createReadStream(filePath)
-    stream.on('data', (chunk) => hash.update(chunk))
-    stream.on('end', () => resolve(hash.digest('hex')))
-    stream.on('error', reject)
-  })
-}
-
 export async function createBackupArchive(
   sourcePaths: string[],
   backupId: string
 ): Promise<CompressResult> {
   const compressedPath = path.join(getBackupDir(), `${backupId}.tar.gz`)
 
-  // tar -czf target.tar.gz -C /parent/dir dirname -C /other dirname ...
-  const args = ['-czf', compressedPath]
+  // tar -cz → stdout, computed sha256 inline while writing to disk
+  const tarArgs = ['-cz']
   for (const src of sourcePaths) {
-    const parent = path.dirname(src)
-    const base = path.basename(src)
-    args.push('-C', parent, base)
+    tarArgs.push('-C', path.dirname(src), path.basename(src))
   }
 
-  await runTar(args)
-  const sha256 = await computeSha256(compressedPath)
-  const { size: compressedSize } = await stat(compressedPath)
+  const sha256 = await new Promise<string>((resolve, reject) => {
+    const tar = spawn('/usr/bin/tar', tarArgs)
+    const writeStream = createWriteStream(compressedPath)
+    const hash = createHash('sha256')
 
+    tar.stdout.pipe(writeStream)
+    tar.stdout.on('data', (chunk: Buffer) => hash.update(chunk))
+
+    let stderr = ''
+    tar.stderr?.on('data', (d: Buffer) => { stderr += d.toString() })
+
+    tar.on('close', (code) => {
+      if (code === 0) {
+        writeStream.end()
+        writeStream.on('finish', () => resolve(hash.digest('hex')))
+      } else {
+        reject(new Error(`tar exited with code ${code}: ${stderr}`))
+      }
+    })
+    tar.on('error', reject)
+  })
+
+  const { size: compressedSize } = await stat(compressedPath)
   return { compressedPath, sha256, compressedSize }
 }
 
@@ -59,7 +66,6 @@ export async function restoreBackupArchive(
   compressedPath: string,
   targetDir: string
 ): Promise<void> {
-  // tar -xzf backup.tar.gz -C /target/dir
   await runTar(['-xzf', compressedPath, '-C', targetDir])
 }
 

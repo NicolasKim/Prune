@@ -3,16 +3,15 @@ import { useScanner } from '../hooks/useScanner'
 import { useCleaner } from '../hooks/useCleaner'
 import ScanResultItem from '../components/ScanResultItem'
 import ScanProgress from '../components/ScanProgress'
+import { formatBytes } from '../../shared/format'
+import type { CacheItem } from '../../shared/types'
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
+interface Props {
+  onScanComplete?: (items: CacheItem[], totalBytes: number) => void
 }
 
-export default function ScannerPage() {
-  const { items, scanning, totalBytes, scanId, error, startScan } = useScanner()
+export default function ScannerPage({ onScanComplete }: Props) {
+  const { items, scanning, totalBytes, scanId, error, startScan } = useScanner(onScanComplete)
   const { cleaning, results, clean, clearResults } = useCleaner()
   const [selected, setSelected] = useState<Set<string>>(new Set())
 

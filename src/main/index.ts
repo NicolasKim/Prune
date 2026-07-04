@@ -2,7 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { getAppSupportDir, getBackupDir } from '../shared/constants'
-import { initDb } from './database'
+import { initDb, closeDb } from './database'
 import { registerIpcHandlers } from './ipc-handlers'
 
 let mainWindow: BrowserWindow | null = null
@@ -47,4 +47,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  closeDb()
 })

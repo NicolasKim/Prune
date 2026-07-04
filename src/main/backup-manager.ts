@@ -4,37 +4,44 @@ import type { BackupMeta, CleanResult } from '../shared/types'
 import { createBackupArchive, restoreBackupArchive, deleteArchive } from './compressor'
 import {
   insertBackup, insertRestoreLog, insertScan, completeScan, insertScanItems,
-  markItemsCleaned, markBackupRestored, deleteBackupRecord, getScanItems, getBackups
+  markItemsCleaned, markBackupRestored, deleteBackupRecord, getScanItems, getBackups, getDb
 } from './database'
 import { runAllScanners } from '../scanner/index'
 import { randomUUID } from 'crypto'
-import { rm, mkdir } from 'fs/promises'
+import { rm, mkdir, cp, mkdtemp } from 'fs/promises'
+import { tmpdir } from 'os'
 
 export async function runScan(): Promise<ScanResultWithItems> {
   const scanId = randomUUID()
   const startedAt = new Date().toISOString()
   insertScan(scanId, startedAt)
 
-  const items = await runAllScanners()
+  try {
+    const items = await runAllScanners()
 
-  const rows = items.map(item => ({
-    id: item.id,
-    scanId,
-    scannerId: item.scannerId,
-    name: item.name,
-    paths: JSON.stringify(item.paths),
-    sizeBytes: item.sizeBytes,
-    riskLevel: item.riskLevel,
-    restoreGuide: item.restoreGuide,
-    selected: 0,
-    cleaned: 0
-  }))
-  insertScanItems(rows)
+    const rows = items.map(item => ({
+      id: item.id,
+      scanId,
+      scannerId: item.scannerId,
+      name: item.name,
+      paths: JSON.stringify(item.paths),
+      sizeBytes: item.sizeBytes,
+      riskLevel: item.riskLevel,
+      restoreGuide: item.restoreGuide,
+      selected: 0,
+      cleaned: 0
+    }))
+    insertScanItems(rows)
 
-  const totalBytes = items.reduce((sum, i) => sum + i.sizeBytes, 0)
-  completeScan(scanId, items.length, totalBytes)
+    const totalBytes = items.reduce((sum, i) => sum + i.sizeBytes, 0)
+    completeScan(scanId, items.length, totalBytes)
 
-  return { id: scanId, startedAt, completedAt: new Date().toISOString(), totalItems: items.length, totalBytes, status: 'completed', items }
+    return { id: scanId, startedAt, completedAt: new Date().toISOString(), totalItems: items.length, totalBytes, status: 'completed', items }
+  } catch (err) {
+    // Mark scan as failed so it doesn't remain 'running' forever
+    getDb().prepare("UPDATE scans SET status = 'failed', completed_at = ? WHERE id = ?").run(new Date().toISOString(), scanId)
+    throw err
+  }
 }
 
 interface ScanResultWithItems {
@@ -77,9 +84,11 @@ export async function cleanItems(itemIds: string[], scanId: string): Promise<Cle
       }
       insertBackup(backupMeta)
 
-      // 3. delete source files
+      // 3. delete source files — track partial deletion
+      const deletedPaths: string[] = []
       for (const p of paths) {
         await rm(p, { recursive: true, force: true })
+        deletedPaths.push(p)
       }
 
       // 4. mark as cleaned
@@ -87,7 +96,10 @@ export async function cleanItems(itemIds: string[], scanId: string): Promise<Cle
 
       results.push({ itemId: row.id, success: true, backupId })
     } catch (err) {
-      results.push({ itemId: row.id, success: false, error: String(err) })
+      const partial = deletedPaths?.length > 0
+        ? `部分路径已删除 (${deletedPaths.length}/${paths.length})，可前往「备份恢复」恢复。${err}`
+        : String(err)
+      results.push({ itemId: row.id, success: false, error: partial })
     }
   }
 
@@ -106,11 +118,20 @@ export async function restoreBackups(backupIds: string[]): Promise<import('../sh
     }
 
     try {
-      // restore each original path
-      for (const origPath of backup.originalPaths) {
-        const parentDir = path.dirname(origPath)
-        await mkdir(parentDir, { recursive: true })
-        await restoreBackupArchive(backup.compressedPath, parentDir)
+      // Extract archive once to a temp directory, then copy each path to its original location
+      const tmpDir = await mkdtemp(path.join(tmpdir(), 'dc-restore-'))
+      try {
+        await restoreBackupArchive(backup.compressedPath, tmpDir)
+
+        for (const origPath of backup.originalPaths) {
+          const basename = path.basename(origPath)
+          const tmpPath = path.join(tmpDir, basename)
+          const parentDir = path.dirname(origPath)
+          await mkdir(parentDir, { recursive: true })
+          await cp(tmpPath, origPath, { recursive: true, force: true })
+        }
+      } finally {
+        await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
       }
 
       markBackupRestored(backupId)

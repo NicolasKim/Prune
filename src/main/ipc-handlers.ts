@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { runScan, cleanItems, restoreBackups, deleteBackups } from './backup-manager'
-import { getScans, getBackups, getScanItems } from './database'
+import { getScans, getBackups, getScanItems, getScan } from './database'
 import type { CacheItem, ScanResult } from '../shared/types'
 
 function parsePaths(item: { paths: string }): string[] {
@@ -48,9 +48,11 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle('get-scan-detail', async (_event, scanId: string) => {
+    const scan = getScan(scanId)
+    if (!scan) throw new Error(`Scan ${scanId} not found`)
     const rows = getScanItems(scanId)
     const items = rows.map(toCacheItem)
-    return { items } as ScanResult
+    return { ...scan, items }
   })
 
   ipcMain.handle('delete-backup', async (_event, backupIds: string[]) => {

@@ -23,7 +23,7 @@ export class UvCacheScanner extends BaseScanner {
         [uvCacheDir],
         size,
         'safe',
-        'uv cache clean 或 uv sync 自动重建'
+        '运行 uv sync 自动重建'
       ))
     }
 

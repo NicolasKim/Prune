@@ -23,7 +23,7 @@ export class DerivedDataScanner extends BaseScanner {
         [ddDir],
         size,
         'safe',
-        'Xcode → Product → Clean Build Folder，或直接 Build 重建'
+        '下次 Build 项目时 Xcode 会自动重建构建产物和索引'
       ))
     }
 

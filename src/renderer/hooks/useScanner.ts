@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { ScanResult, CacheItem } from '../../shared/types'
 
-export function useScanner() {
+export function useScanner(onScanResult?: (items: CacheItem[], totalBytes: number) => void) {
   const [items, setItems] = useState<CacheItem[]>([])
   const [scanning, setScanning] = useState(false)
   const [totalBytes, setTotalBytes] = useState(0)
@@ -16,12 +16,13 @@ export function useScanner() {
       setItems(result.items)
       setTotalBytes(result.totalBytes)
       setScanId(result.id)
+      onScanResult?.(result.items, result.totalBytes)
     } catch (err) {
       setError(String(err))
     } finally {
       setScanning(false)
     }
-  }, [])
+  }, [onScanResult])
 
   return { items, scanning, totalBytes, scanId, error, startScan }
 }

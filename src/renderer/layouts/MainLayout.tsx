@@ -1,24 +1,21 @@
-import { useState, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import Sidebar from '../components/Sidebar'
 import ScannerPage from '../pages/ScannerPage'
 import BackupPage from '../pages/BackupPage'
 import SettingsPage from '../pages/SettingsPage'
 import type { CacheItem } from '../../shared/types'
 
-interface Props {
-  scanItems?: CacheItem[]
-}
-
-export default function MainLayout({ scanItems = [] }: Props) {
+export default function MainLayout() {
   const [activePage, setActivePage] = useState('scanner')
+  const [categorySizes, setCategorySizes] = useState<Record<string, number>>({})
 
-  const categorySizes = useMemo(() => {
+  const handleScanComplete = useCallback((items: CacheItem[]) => {
     const map: Record<string, number> = {}
-    for (const item of scanItems) {
+    for (const item of items) {
       map[item.scannerId] = (map[item.scannerId] || 0) + item.sizeBytes
     }
-    return map
-  }, [scanItems])
+    setCategorySizes(map)
+  }, [])
 
   return (
     <div className="flex h-screen">
@@ -28,7 +25,7 @@ export default function MainLayout({ scanItems = [] }: Props) {
         categorySizes={categorySizes}
       />
       <main className="flex-1 p-6 overflow-hidden">
-        {activePage === 'scanner' && <ScannerPage />}
+        {activePage === 'scanner' && <ScannerPage onScanComplete={handleScanComplete} />}
         {activePage === 'backups' && <BackupPage />}
         {activePage === 'settings' && <SettingsPage />}
       </main>
