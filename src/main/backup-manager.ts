@@ -1,14 +1,14 @@
 import path from 'path'
-import { BACKUP_DIR } from '../shared/constants'
+import { getBackupDir } from '../shared/constants'
 import type { BackupMeta, CleanResult } from '../shared/types'
 import { createBackupArchive, restoreBackupArchive, deleteArchive } from './compressor'
 import {
   insertBackup, insertRestoreLog, insertScan, completeScan, insertScanItems,
-  markItemsCleaned, markBackupRestored, deleteBackupRecord
+  markItemsCleaned, markBackupRestored, deleteBackupRecord, getScanItems, getBackups
 } from './database'
 import { runAllScanners } from '../scanner/index'
 import { randomUUID } from 'crypto'
-import { mkdir } from 'fs/promises'
+import { rm, mkdir } from 'fs/promises'
 
 export async function runScan(): Promise<ScanResultWithItems> {
   const scanId = randomUUID()
@@ -48,9 +48,8 @@ interface ScanResultWithItems {
 }
 
 export async function cleanItems(itemIds: string[], scanId: string): Promise<CleanResult[]> {
-  await mkdir(BACKUP_DIR, { recursive: true })
+  await mkdir(getBackupDir(), { recursive: true })
   const results: CleanResult[] = []
-  const { getScanItems } = await import('./database')
   const rows = getScanItems(scanId).filter(r => itemIds.includes(r.id))
 
   for (const row of rows) {
@@ -79,7 +78,6 @@ export async function cleanItems(itemIds: string[], scanId: string): Promise<Cle
       insertBackup(backupMeta)
 
       // 3. delete source files
-      const { rm } = await import('fs/promises')
       for (const p of paths) {
         await rm(p, { recursive: true, force: true })
       }
@@ -98,7 +96,6 @@ export async function cleanItems(itemIds: string[], scanId: string): Promise<Cle
 
 export async function restoreBackups(backupIds: string[]): Promise<import('../shared/types').RestoreResult[]> {
   const results: import('../shared/types').RestoreResult[] = []
-  const { getBackups } = await import('./database')
   const allBackups = getBackups()
 
   for (const backupId of backupIds) {
@@ -134,7 +131,7 @@ export async function restoreBackups(backupIds: string[]): Promise<import('../sh
 }
 
 export async function deleteBackups(backupIds: string[]): Promise<void> {
-  const allBackups = (await import('./database')).getBackups()
+  const allBackups = getBackups()
   for (const backupId of backupIds) {
     const backup = allBackups.find(b => b.id === backupId)
     if (backup) {

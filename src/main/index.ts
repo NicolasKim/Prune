@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { APP_SUPPORT_DIR, BACKUP_DIR } from '../shared/constants'
+import { getAppSupportDir, getBackupDir } from '../shared/constants'
 import { initDb } from './database'
 import { registerIpcHandlers } from './ipc-handlers'
 
@@ -35,8 +35,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  fs.mkdirSync(APP_SUPPORT_DIR, { recursive: true })
-  fs.mkdirSync(BACKUP_DIR, { recursive: true })
+  fs.mkdirSync(getAppSupportDir(), { recursive: true })
+  fs.mkdirSync(getBackupDir(), { recursive: true })
   initDb()
   registerIpcHandlers()
   createWindow()

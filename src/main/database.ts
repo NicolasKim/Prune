@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { DB_PATH } from '../shared/constants'
+import { getDbPath } from '../shared/constants'
 import type { ScanMeta, CacheItemRow, BackupMeta, RestoreResult } from '../shared/types'
 
 let db: Database.Database | null = null
@@ -10,7 +10,7 @@ export function getDb(): Database.Database {
 }
 
 export function initDb(): void {
-  db = new Database(DB_PATH)
+  db = new Database(getDbPath())
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
 

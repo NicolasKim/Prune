@@ -1,9 +1,9 @@
 import { execFile } from 'child_process'
 import { createHash } from 'crypto'
 import { createReadStream } from 'fs'
-import { unlink } from 'fs/promises'
+import { unlink, stat } from 'fs/promises'
 import path from 'path'
-import { BACKUP_DIR } from '../shared/constants'
+import { getBackupDir } from '../shared/constants'
 
 export interface CompressResult {
   compressedPath: string
@@ -14,9 +14,11 @@ export interface CompressResult {
 function runTar(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = execFile('/usr/bin/tar', args, { maxBuffer: 1024 * 1024 * 100 })
+    let stderr = ''
+    child.stderr?.on('data', (d: Buffer) => { stderr += d.toString() })
     child.on('exit', (code) => {
       if (code === 0) resolve()
-      else reject(new Error(`tar exited with code ${code}`))
+      else reject(new Error(`tar exited with code ${code}: ${stderr}`))
     })
     child.on('error', reject)
   })
@@ -36,7 +38,7 @@ export async function createBackupArchive(
   sourcePaths: string[],
   backupId: string
 ): Promise<CompressResult> {
-  const compressedPath = path.join(BACKUP_DIR, `${backupId}.tar.gz`)
+  const compressedPath = path.join(getBackupDir(), `${backupId}.tar.gz`)
 
   // tar -czf target.tar.gz -C /parent/dir dirname -C /other dirname ...
   const args = ['-czf', compressedPath]
@@ -48,9 +50,7 @@ export async function createBackupArchive(
 
   await runTar(args)
   const sha256 = await computeSha256(compressedPath)
-  const { size: compressedSize } = await import('fs/promises').then(fs =>
-    fs.stat(compressedPath)
-  )
+  const { size: compressedSize } = await stat(compressedPath)
 
   return { compressedPath, sha256, compressedSize }
 }
