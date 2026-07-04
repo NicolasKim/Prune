@@ -85,7 +85,7 @@ export interface CleanResult {
 
 export interface Api {
   scan: () => Promise<ScanResult>
-  clean: (itemIds: string[]) => Promise<CleanResult[]>
+  clean: (payload: { itemIds: string[]; scanId: string }) => Promise<CleanResult[]>
   restore: (backupIds: string[]) => Promise<RestoreResult[]>
   listBackups: () => Promise<BackupMeta[]>
   listScans: () => Promise<ScanMeta[]>

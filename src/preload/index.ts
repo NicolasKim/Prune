@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 const api = {
   scan: () => ipcRenderer.invoke('scan'),
-  clean: (itemIds: string[]) => ipcRenderer.invoke('clean', itemIds),
+  clean: (payload: { itemIds: string[]; scanId: string }) => ipcRenderer.invoke('clean', payload),
   restore: (backupIds: string[]) => ipcRenderer.invoke('restore', backupIds),
   listBackups: () => ipcRenderer.invoke('list-backups'),
   listScans: () => ipcRenderer.invoke('list-scans'),
