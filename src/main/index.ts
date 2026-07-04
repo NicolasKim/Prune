@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
+import { initDb } from './database'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -31,6 +32,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  initDb()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
