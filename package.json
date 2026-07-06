@@ -1,6 +1,6 @@
 {
   "name": "devcleaner",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Developer-focused disk cleanup tool for macOS",
   "main": "./out/main/index.js",
