@@ -2,3 +2,27 @@ node_modules/
 out/
 dist/
 *.tsbuildinfo
+
+# macOS
+.DS_Store
+*.icloud
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build artifacts
+*.dmg
+*.zip
+*.blockmap
