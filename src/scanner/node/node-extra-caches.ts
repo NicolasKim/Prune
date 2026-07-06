@@ -1,11 +1,8 @@
 import { homedir } from 'os'
 import path from 'path'
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import { BaseScanner } from '../base'
+import { getNamedDirectories } from '../scan-context'
 import type { CacheItem } from '../../shared/types'
-
-const execAsync = promisify(exec)
 
 export class NodeExtraCachesScanner extends BaseScanner {
   id = 'node.extra'
@@ -35,7 +32,7 @@ export class NodeExtraCachesScanner extends BaseScanner {
     }
 
     // Next.js build directories
-    const nextPaths = await this.findDirs('.next')
+    const nextPaths = getNamedDirectories('.next')
     if (nextPaths.length > 0) {
       let nextTotalSize = 0
       for (const p of nextPaths) {
@@ -49,7 +46,7 @@ export class NodeExtraCachesScanner extends BaseScanner {
     }
 
     // Nuxt build directories
-    const nuxtPaths = await this.findDirs('.nuxt')
+    const nuxtPaths = getNamedDirectories('.nuxt')
     if (nuxtPaths.length > 0) {
       let nuxtTotalSize = 0
       for (const p of nuxtPaths) {
@@ -86,25 +83,58 @@ export class NodeExtraCachesScanner extends BaseScanner {
         [puppeteerPath], puppeteerSize, 'safe', '运行 npx puppeteer browsers install 或运行 Puppeteer 脚本时自动重新下载'))
     }
 
-    return items
-  }
-
-  private async findDirs(dirName: string): Promise<string[]> {
-    const home = homedir()
-    const searchPaths = [
-      home,
-      path.join(home, 'Documents'),
-      path.join(home, 'Projects'),
-      path.join(home, 'Desktop'),
-      path.join(home, 'Sites'),
-    ]
-    try {
-      const { stdout } = await execAsync(
-        `find ${searchPaths.join(' ')} -maxdepth 5 -name '${dirName}' -type d 2>/dev/null`
-      )
-      return stdout.trim().split('\n').filter(Boolean)
-    } catch {
-      return []
+    // Playwright browser cache
+    const playwrightPath = path.join(home, '.cache', 'ms-playwright')
+    const playwrightSize = await this.getSize(playwrightPath)
+    if (playwrightSize > 0) {
+      items.push(this.makeItem('playwright', 'Playwright 浏览器缓存', 'Playwright 下载的 Chromium/Firefox/WebKit 浏览器',
+        [playwrightPath], playwrightSize, 'safe', 'npx playwright install 重新下载'))
     }
+
+    // Cypress binary cache
+    const cypressPath = path.join(home, '.cache', 'Cypress')
+    const cypressSize = await this.getSize(cypressPath)
+    if (cypressSize > 0) {
+      items.push(this.makeItem('cypress', 'Cypress 浏览器缓存', 'Cypress 下载的测试浏览器二进制包',
+        [cypressPath], cypressSize, 'safe', 'npx cypress install 重新下载'))
+    }
+
+    // Yarn Classic cache (~/.cache/yarn, Yarn 1.x)
+    const yarnClassicPath = path.join(home, '.cache', 'yarn')
+    const yarnClassicSize = await this.getSize(yarnClassicPath)
+    if (yarnClassicSize > 0) {
+      items.push(this.makeItem('yarn-classic-cache', 'Yarn Classic 缓存', 'Yarn 1.x 包管理器下载缓存',
+        [yarnClassicPath], yarnClassicSize, 'safe', '运行 yarn install 自动重建'))
+    }
+
+    // Vite project caches
+    const vitePaths = getNamedDirectories('.vite')
+    if (vitePaths.length > 0) {
+      let viteTotalSize = 0
+      for (const p of vitePaths) {
+        viteTotalSize += await this.getSize(p)
+      }
+      if (viteTotalSize > 0) {
+        items.push(this.makeItem('vite-cache', `Vite 缓存 (${vitePaths.length} 个项目)`,
+          'Vite 开发服务器缓存的依赖预构建产物',
+          vitePaths, viteTotalSize, 'safe', '下次 vite dev / vite build 自动重建'))
+      }
+    }
+
+    // Angular build cache
+    const angularPaths = getNamedDirectories('.angular')
+    if (angularPaths.length > 0) {
+      let angularTotalSize = 0
+      for (const p of angularPaths) {
+        angularTotalSize += await this.getSize(p)
+      }
+      if (angularTotalSize > 0) {
+        items.push(this.makeItem('angular-cache', `Angular 构建缓存 (${angularPaths.length} 个项目)`,
+          'Angular CLI 构建缓存',
+          angularPaths, angularTotalSize, 'safe', '下次 ng build / ng serve 自动重建'))
+      }
+    }
+
+    return items
   }
 }

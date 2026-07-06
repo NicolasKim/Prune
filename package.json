@@ -8,7 +8,10 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "postinstall": "electron-builder install-app-deps"
+    "pack:mac": "electron-vite build && electron-builder --mac",
+    "postinstall": "electron-builder install-app-deps && node scripts/patch-electron-name.js",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
@@ -20,6 +23,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^4.1.9",
     "autoprefixer": "^10.4.19",
     "electron": "^31.0.0",
     "electron-builder": "^25.0.0",
@@ -27,6 +31,29 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.2",
-    "vite": "^5.3.1"
+    "vite": "^5.3.1",
+    "vitest": "^4.1.9"
+  },
+  "build": {
+    "appId": "com.devcleaner.app",
+    "productName": "Prune",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "resources/icon.png"
+    },
+    "extraResources": [
+      {
+        "from": "resources/prune-logo.png",
+        "to": "prune-logo.png"
+      },
+      {
+        "from": "resources/icon.png",
+        "to": "icon.png"
+      },
+      {
+        "from": "resources/trayTemplate.png",
+        "to": "trayTemplate.png"
+      }
+    ]
   }
 }

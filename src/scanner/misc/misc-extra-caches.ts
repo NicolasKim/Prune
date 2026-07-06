@@ -119,6 +119,36 @@ export class MiscExtraCachesScanner extends BaseScanner {
       ))
     }
 
+    // Ollama models
+    const ollamaDir = path.join(home, '.ollama', 'models')
+    const ollamaSize = await this.getSize(ollamaDir)
+    if (ollamaSize > 0) {
+      items.push(this.makeItem(
+        'ollama-models',
+        'Ollama 模型',
+        '本地下载的 LLM 模型文件，单个模型几 GB 到几十 GB',
+        [ollamaDir],
+        ollamaSize,
+        'caution',
+        'ollama pull <model> 重新下载所需模型'
+      ))
+    }
+
+    // Terraform plugin cache
+    const terraformDir = path.join(home, '.terraform.d', 'plugins')
+    const terraformSize = await this.getSize(terraformDir)
+    if (terraformSize > 0) {
+      items.push(this.makeItem(
+        'terraform-plugins',
+        'Terraform 插件缓存',
+        'Terraform provider 插件二进制，terraform init 自动重下',
+        [terraformDir],
+        terraformSize,
+        'safe',
+        'terraform init 重新下载 provider 插件'
+      ))
+    }
+
     return items
   }
 }

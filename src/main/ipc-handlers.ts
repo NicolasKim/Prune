@@ -1,7 +1,13 @@
 import { ipcMain } from 'electron'
-import { runScan, cleanItems, restoreBackups, deleteBackups } from './backup-manager'
-import { getScans, getBackups, getScanItems, getScan } from './database'
-import type { CacheItem, ScanResult } from '../shared/types'
+import { runScan, cleanItems } from './backup-manager'
+import { getScans, getScanItems, getScan } from './database'
+import {
+  readSettings,
+  writeSettings,
+  applyLaunchAtLogin,
+  type AppSettings,
+} from './settings'
+import type { CacheItem } from '../shared/types'
 
 function parsePaths(item: { paths: string }): string[] {
   try { return JSON.parse(item.paths) } catch { return [item.paths] }
@@ -17,7 +23,6 @@ function toCacheItem(row: import('../shared/types').CacheItemRow): CacheItem {
     sizeBytes: row.sizeBytes,
     riskLevel: row.riskLevel,
     restoreGuide: row.restoreGuide,
-    isProjectScoped: false
   }
 }
 
@@ -28,19 +33,6 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('clean', async (_event, payload: { itemIds: string[]; scanId: string }) => {
     return await cleanItems(payload.itemIds, payload.scanId)
-  })
-
-  ipcMain.handle('restore', async (_event, backupIds: string[]) => {
-    return await restoreBackups(backupIds)
-  })
-
-  ipcMain.handle('list-backups', async () => {
-    return getBackups().map(b => ({
-      ...b,
-      originalPaths: typeof b.originalPaths === 'string'
-        ? JSON.parse(b.originalPaths as string)
-        : b.originalPaths
-    }))
   })
 
   ipcMain.handle('list-scans', async () => {
@@ -55,7 +47,19 @@ export function registerIpcHandlers(): void {
     return { ...scan, items }
   })
 
-  ipcMain.handle('delete-backup', async (_event, backupIds: string[]) => {
-    await deleteBackups(backupIds)
+  ipcMain.handle('get-settings', async () => {
+    return readSettings()
+  })
+
+  ipcMain.handle('set-settings', async (_event, partial: Partial<AppSettings>) => {
+    const current = readSettings()
+    const next: AppSettings = { ...current, ...partial }
+    writeSettings(next)
+
+    if (typeof partial.launchAtLogin === 'boolean') {
+      applyLaunchAtLogin(partial.launchAtLogin)
+    }
+
+    return next
   })
 }

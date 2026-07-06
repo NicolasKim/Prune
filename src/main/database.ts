@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 import { getDbPath } from '../shared/constants'
-import type { ScanMeta, CacheItemRow, BackupMeta, RestoreResult } from '../shared/types'
+import type { ScanMeta, CacheItemRow } from '../shared/types'
 
 let db: Database.Database | null = null
 
@@ -33,31 +33,8 @@ export function initDb(): void {
       size_bytes INTEGER NOT NULL,
       risk_level TEXT NOT NULL,
       restore_guide TEXT DEFAULT '',
-      selected INTEGER DEFAULT 0,
       cleaned INTEGER DEFAULT 0,
       PRIMARY KEY (scan_id, id)
-    );
-
-    CREATE TABLE IF NOT EXISTS backups (
-      id TEXT PRIMARY KEY,
-      scan_id TEXT NOT NULL,
-      item_id TEXT NOT NULL,
-      original_paths TEXT NOT NULL,
-      compressed_path TEXT NOT NULL,
-      original_size INTEGER NOT NULL,
-      compressed_size INTEGER NOT NULL,
-      sha256 TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      restored_at TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS restore_logs (
-      id TEXT PRIMARY KEY,
-      backup_id TEXT NOT NULL REFERENCES backups(id),
-      restored_at TEXT NOT NULL,
-      target_paths TEXT NOT NULL,
-      status TEXT NOT NULL,
-      error_message TEXT DEFAULT ''
     );
   `)
 }
@@ -101,7 +78,18 @@ export function getScan(scanId: string): ScanMeta | undefined {
 }
 
 export function getScanItems(scanId: string): CacheItemRow[] {
-  return getDb().prepare('SELECT * FROM scan_items WHERE scan_id = ?').all(scanId) as CacheItemRow[]
+  return getDb().prepare(`
+    SELECT id,
+           scan_id AS scanId,
+           scanner_id AS scannerId,
+           name,
+           paths,
+           size_bytes AS sizeBytes,
+           risk_level AS riskLevel,
+           restore_guide AS restoreGuide,
+           cleaned
+    FROM scan_items WHERE scan_id = ?
+  `).all(scanId) as CacheItemRow[]
 }
 
 export function markItemsCleaned(itemIds: string[]): void {
@@ -112,52 +100,11 @@ export function markItemsCleaned(itemIds: string[]): void {
   tx(itemIds)
 }
 
-export function insertBackup(backup: BackupMeta): void {
+export function failOrphanedRunningScans(): void {
   getDb().prepare(`
-    INSERT INTO backups (id, scan_id, item_id, original_paths, compressed_path,
-      original_size, compressed_size, sha256, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    backup.id, backup.scanId, backup.itemId,
-    JSON.stringify(backup.originalPaths),
-    backup.compressedPath,
-    backup.originalSize, backup.compressedSize,
-    backup.sha256, backup.createdAt
-  )
-}
-
-export function getBackups(): BackupMeta[] {
-  const rows = getDb().prepare(`
-    SELECT b.id, b.scan_id AS scanId, b.item_id AS itemId,
-           s.name AS itemName,
-           b.original_paths AS originalPaths, b.compressed_path AS compressedPath,
-           b.original_size AS originalSize, b.compressed_size AS compressedSize,
-           b.sha256, b.created_at AS createdAt, b.restored_at AS restoredAt
-    FROM backups b
-    LEFT JOIN scan_items s ON s.id = b.item_id
-    ORDER BY b.created_at DESC
-  `).all() as Array<Record<string, unknown>>
-  return rows.map(r => ({
-    ...r,
-    originalPaths: typeof r.originalPaths === 'string' ? JSON.parse(r.originalPaths as string) : r.originalPaths
-  })) as BackupMeta[]
-}
-
-export function markBackupRestored(backupId: string): void {
-  getDb().prepare('UPDATE backups SET restored_at = ? WHERE id = ?')
-    .run(new Date().toISOString(), backupId)
-}
-
-export function deleteBackupRecord(backupId: string): void {
-  getDb().prepare('DELETE FROM restore_logs WHERE backup_id = ?').run(backupId)
-  getDb().prepare('DELETE FROM backups WHERE id = ?').run(backupId)
-}
-
-export function insertRestoreLog(log: RestoreResult & { backupId: string; targetPaths: string[] }): void {
-  getDb().prepare(`
-    INSERT INTO restore_logs (id, backup_id, restored_at, target_paths, status, error_message)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(log.id, log.backupId, new Date().toISOString(), JSON.stringify(log.targetPaths), log.status, log.errorMessage || '')
+    UPDATE scans SET status = 'failed', completed_at = ?
+    WHERE status = 'running'
+  `).run(new Date().toISOString())
 }
 
 export function closeDb(): void {

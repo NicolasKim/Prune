@@ -57,8 +57,7 @@ export abstract class BaseScanner implements TechStackScanner {
     paths: string[],
     sizeBytes: number,
     riskLevel: RiskLevel,
-    restoreGuide: string,
-    isProjectScoped: boolean = false
+    restoreGuide: string
   ): CacheItem {
     return {
       id: `${this.id}.${id}`,
@@ -69,7 +68,6 @@ export abstract class BaseScanner implements TechStackScanner {
       sizeBytes,
       riskLevel,
       restoreGuide,
-      isProjectScoped
     }
   }
 }

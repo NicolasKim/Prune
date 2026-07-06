@@ -12,7 +12,7 @@ export default function ScanProgress({ scanning, itemCount, onCancel }: Props) {
       {scanning ? (
         <>
           <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm text-blue-700">正在扫描...</span>
+          <span className="text-sm text-blue-700">正在扫描 ~/（首次全量扫描可能需要数分钟）...</span>
         </>
       ) : (
         <span className="text-sm text-green-700">

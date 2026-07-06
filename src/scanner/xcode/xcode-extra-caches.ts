@@ -31,6 +31,30 @@ export class XcodeExtraCachesScanner extends BaseScanner {
         restoreGuide: '连接对应 iOS 版本的设备后 Xcode 会自动重新下载'
       },
       {
+        id: 'watchOSDeviceSupport',
+        name: 'watchOS DeviceSupport',
+        description: '旧 watchOS 版本设备支持文件',
+        relativePath: path.join('Library', 'Developer', 'Xcode', 'watchOS DeviceSupport'),
+        riskLevel: 'caution',
+        restoreGuide: '连接对应 watchOS 版本的 Apple Watch 后 Xcode 会自动重新下载'
+      },
+      {
+        id: 'tvOSDeviceSupport',
+        name: 'tvOS DeviceSupport',
+        description: '旧 tvOS 版本设备支持文件',
+        relativePath: path.join('Library', 'Developer', 'Xcode', 'tvOS DeviceSupport'),
+        riskLevel: 'caution',
+        restoreGuide: '连接对应 tvOS 版本的 Apple TV 后 Xcode 会自动重新下载'
+      },
+      {
+        id: 'visionOSDeviceSupport',
+        name: 'visionOS DeviceSupport',
+        description: '旧 visionOS 版本设备支持文件',
+        relativePath: path.join('Library', 'Developer', 'Xcode', 'visionOS DeviceSupport'),
+        riskLevel: 'caution',
+        restoreGuide: '连接对应 visionOS 版本的 Apple Vision Pro 后 Xcode 会自动重新下载'
+      },
+      {
         id: 'simulators',
         name: 'CoreSimulator Devices',
         description: '模拟器运行时数据，删除后需重新下载对应版本',

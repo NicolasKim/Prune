@@ -1,12 +1,9 @@
 import { homedir } from 'os'
 import path from 'path'
 import fs from 'fs/promises'
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import { BaseScanner } from '../base'
+import { getProjectRegistry } from '../scan-context'
 import type { CacheItem } from '../../shared/types'
-
-const execAsync = promisify(exec)
 
 export class FlutterCacheScanner extends BaseScanner {
   id = 'misc.flutter'
@@ -100,7 +97,7 @@ export class FlutterCacheScanner extends BaseScanner {
     }
 
     // 5. Flutter 项目构建产物 — 按项目汇总
-    const projectDirs = await this.findFlutterProjects()
+    const projectDirs = getProjectRegistry().getByStack('flutter')
     if (projectDirs.length > 0) {
       // build/ 目录
       let buildCount = 0
@@ -168,33 +165,59 @@ export class FlutterCacheScanner extends BaseScanner {
       ))
     }
 
-    return items
-  }
-
-  private async findFlutterProjects(): Promise<string[]> {
-    const home = homedir()
-    const searchPaths = [
-      home,
-      path.join(home, 'Documents'),
-      path.join(home, 'Projects'),
-      path.join(home, 'Desktop'),
-      path.join(home, 'Sites'),
-    ]
-    try {
-      const { stdout } = await execAsync(
-        `find ${searchPaths.join(' ')} -maxdepth 5 -name 'pubspec.yaml' -type f 2>/dev/null`
-      )
-      const files = stdout.trim().split('\n').filter(Boolean)
-      const dirs = new Set<string>()
-      for (const f of files) {
-        const parent = path.dirname(f)
-        // 跳过 .pub-cache 和 fvm 内部的 pubspec.yaml
-        if (parent.includes('.pub-cache') || parent.includes('fvm')) continue
-        dirs.add(parent)
+    // 7. Flutter 项目 android/.gradle/ 和 ios/Pods/
+    if (projectDirs.length > 0) {
+      // android/.gradle/
+      let agCount = 0
+      let agTotalSize = 0
+      const agPaths: string[] = []
+      for (const proj of projectDirs) {
+        const agDir = path.join(proj, 'android', '.gradle')
+        const s = await this.getSize(agDir)
+        if (s > 0) {
+          agTotalSize += s
+          agPaths.push(agDir)
+          agCount++
+        }
       }
-      return Array.from(dirs)
-    } catch {
-      return []
+      if (agTotalSize > 0) {
+        items.push(this.makeItem(
+          'project-android-gradle',
+          `Flutter 项目 Android Gradle 缓存 (${agCount} 个项目)`,
+          'Flutter 项目 android/.gradle/ 目录',
+          agPaths,
+          agTotalSize,
+          'safe',
+          'cd android && ./gradlew build 自动重建'
+        ))
+      }
+
+      // ios/Pods/
+      let podsCount = 0
+      let podsTotalSize = 0
+      const podsPaths: string[] = []
+      for (const proj of projectDirs) {
+        const podsDir = path.join(proj, 'ios', 'Pods')
+        const s = await this.getSize(podsDir)
+        if (s > 0) {
+          podsTotalSize += s
+          podsPaths.push(podsDir)
+          podsCount++
+        }
+      }
+      if (podsTotalSize > 0) {
+        items.push(this.makeItem(
+          'project-ios-pods',
+          `Flutter 项目 iOS Pods (${podsCount} 个项目)`,
+          'Flutter 项目 ios/Pods/ 目录，CocoaPods 安装的依赖',
+          podsPaths,
+          podsTotalSize,
+          'conditional',
+          'cd ios && pod install 重新安装'
+        ))
+      }
     }
+
+    return items
   }
 }

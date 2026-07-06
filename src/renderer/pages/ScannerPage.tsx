@@ -1,17 +1,18 @@
 import { useState, useCallback } from 'react'
-import { useScanner } from '../hooks/useScanner'
 import { useCleaner } from '../hooks/useCleaner'
 import ScanResultItem from '../components/ScanResultItem'
 import ScanProgress from '../components/ScanProgress'
 import { formatBytes } from '../../shared/format'
-import type { CacheItem } from '../../shared/types'
+import type { useScanner } from '../hooks/useScanner'
+
+type ScanSession = ReturnType<typeof useScanner>
 
 interface Props {
-  onScanComplete?: (items: CacheItem[], totalBytes: number) => void
+  scanSession: ScanSession
 }
 
-export default function ScannerPage({ onScanComplete }: Props) {
-  const { items, scanning, totalBytes, scanId, error, startScan } = useScanner(onScanComplete)
+export default function ScannerPage({ scanSession }: Props) {
+  const { items, scanning, scanId, error, startScan, removeItems } = scanSession
   const { cleaning, results, clean, clearResults } = useCleaner()
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -24,18 +25,25 @@ export default function ScannerPage({ onScanComplete }: Props) {
     })
   }, [])
 
+  const selectSafeItems = useCallback(() => {
+    setSelected(new Set(items.filter(i => i.riskLevel === 'safe').map(i => i.id)))
+  }, [items])
+
+  const safeItemCount = items.filter(i => i.riskLevel === 'safe').length
+
   const handleClean = useCallback(async () => {
     if (!scanId) return
     const res = await clean(Array.from(selected), scanId)
     if (res) {
-      const cleanedIds = new Set(res.filter(r => r.success).map(r => r.itemId))
+      const cleanedIds = res.filter(r => r.success).map(r => r.itemId)
+      removeItems(cleanedIds)
       setSelected(prev => {
         const next = new Set(prev)
         cleanedIds.forEach(id => next.delete(id))
         return next
       })
     }
-  }, [scanId, selected, clean])
+  }, [scanId, selected, clean, removeItems])
 
   const selectedCount = selected.size
   const selectedBytes = items.filter(i => selected.has(i.id)).reduce((s, i) => s + i.sizeBytes, 0)
@@ -56,6 +64,18 @@ export default function ScannerPage({ onScanComplete }: Props) {
 
       {/* Progress */}
       <ScanProgress scanning={scanning} itemCount={items.length} />
+
+      {!scanning && safeItemCount > 0 && (
+        <div className="flex items-center justify-end">
+          <button
+            onClick={selectSafeItems}
+            disabled={cleaning}
+            className="px-3 py-1.5 text-sm font-medium text-green-800 bg-green-100 rounded-lg hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            选择全部安全项（{safeItemCount}）
+          </button>
+        </div>
+      )}
 
       {/* Error */}
       {error && (

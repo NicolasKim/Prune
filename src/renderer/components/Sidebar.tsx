@@ -1,4 +1,5 @@
 import { formatBytes } from '../../shared/format'
+import pruneLogo from '../assets/prune-logo.png'
 
 interface NavItem {
   id: string
@@ -8,7 +9,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: 'scanner', label: '扫描清理', icon: '🧹' },
-  { id: 'backups', label: '备份恢复', icon: '📦' },
   { id: 'settings', label: '设置', icon: '⚙️' }
 ]
 
@@ -22,12 +22,21 @@ export default function Sidebar({ activePage, onNavigate, categorySizes = {} }: 
   const totalBytes = Object.values(categorySizes).reduce((s, v) => s + v, 0)
 
   return (
-    <aside className="w-56 bg-white border-r border-gray-200 flex flex-col py-4">
-      {/* App title */}
-      <div className="px-4 mb-6">
-        <h1 className="text-lg font-bold text-gray-800">DevCleaner</h1>
-        <p className="text-xs text-gray-400 mt-0.5">macOS 开发者缓存清理</p>
-        <p className="text-xs text-gray-500 mt-1">总计可释放 <strong>{formatBytes(totalBytes)}</strong></p>
+    <aside className="w-56 bg-white border-r border-gray-200 flex flex-col pb-4 app-no-drag">
+      {/* App title — draggable for window move */}
+      <div className="px-4 mb-6 titlebar-drag">
+        <div className="flex items-center gap-2.5">
+          <img
+            src={pruneLogo}
+            alt="Prune"
+            className="w-9 h-9 rounded-xl shadow-sm"
+          />
+          <div>
+            <h1 className="text-lg font-bold text-gray-800">Prune</h1>
+            <p className="text-xs text-gray-400">开发者缓存清理</p>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-3">总计可释放 <strong>{formatBytes(totalBytes)}</strong></p>
       </div>
 
       {/* Navigation */}

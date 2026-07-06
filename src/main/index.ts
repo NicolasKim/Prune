@@ -1,18 +1,29 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { getAppSupportDir, getBackupDir } from '../shared/constants'
-import { initDb, closeDb } from './database'
+import { APP_NAME, getAppSupportDir } from '../shared/constants'
+import { initDb, closeDb, failOrphanedRunningScans } from './database'
 import { registerIpcHandlers } from './ipc-handlers'
+import { readSettings, syncLaunchAtLoginSetting } from './settings'
+import { createTray, destroyTray, getAppIconPath } from './tray'
 
 let mainWindow: BrowserWindow | null = null
+let isQuitting = false
 
-function createWindow(): void {
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow
+}
+
+// Set app name for Dock display (macOS). Must be called before ready event.
+app.setName(APP_NAME)
+
+function createWindow(show = true): void {
   mainWindow = new BrowserWindow({
     width: 900,
     height: 680,
     minWidth: 700,
     minHeight: 500,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -20,11 +31,18 @@ function createWindow(): void {
       nodeIntegration: false
     },
     titleBarStyle: 'hiddenInset',
-    show: false
+    icon: getAppIconPath(),
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
+    if (show) mainWindow?.show()
+  })
+
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -35,20 +53,39 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Set Dock icon in development (packaged app uses the .app bundle icon).
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    app.dock.setIcon(getAppIconPath())
+  }
+
   fs.mkdirSync(getAppSupportDir(), { recursive: true })
-  fs.mkdirSync(getBackupDir(), { recursive: true })
   initDb()
+  failOrphanedRunningScans()
   registerIpcHandlers()
-  createWindow()
+
+  const settings = readSettings()
+  syncLaunchAtLoginSetting(settings)
+
+  const openedAtLogin = app.getLoginItemSettings().wasOpenedAtLogin === true
+  createWindow(!openedAtLogin)
+  createTray(getMainWindow)
+
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (mainWindow) {
+      mainWindow.show()
+      mainWindow.focus()
+    } else {
+      createWindow(true)
+    }
   })
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  // Keep running in menu bar tray on macOS.
 })
 
 app.on('before-quit', () => {
+  isQuitting = true
   closeDb()
+  destroyTray()
 })

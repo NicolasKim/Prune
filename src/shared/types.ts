@@ -1,6 +1,5 @@
 export type RiskLevel = 'safe' | 'conditional' | 'caution'
 export type ScanStatus = 'running' | 'completed' | 'failed'
-export type RestoreStatus = 'success' | 'partial' | 'failed'
 
 export interface CacheItem {
   id: string
@@ -11,7 +10,6 @@ export interface CacheItem {
   sizeBytes: number
   riskLevel: RiskLevel
   restoreGuide: string
-  isProjectScoped: boolean
 }
 
 export interface CacheItemRow {
@@ -55,42 +53,24 @@ export interface ScanMeta {
   status: ScanStatus
 }
 
-export interface BackupMeta {
-  id: string
-  scanId: string
-  itemId: string
-  itemName: string
-  originalPaths: string[]
-  compressedPath: string
-  originalSize: number
-  compressedSize: number
-  sha256: string
-  createdAt: string
-  restoredAt: string | null
-}
-
-export interface RestoreResult {
-  id: string
-  backupId: string
-  status: RestoreStatus
-  errorMessage?: string
-}
-
 export interface CleanResult {
   itemId: string
   success: boolean
-  backupId?: string
   error?: string
+}
+
+export interface AppSettings {
+  launchAtLogin: boolean
 }
 
 export interface Api {
   scan: () => Promise<ScanResult>
   clean: (payload: { itemIds: string[]; scanId: string }) => Promise<CleanResult[]>
-  restore: (backupIds: string[]) => Promise<RestoreResult[]>
-  listBackups: () => Promise<BackupMeta[]>
   listScans: () => Promise<ScanMeta[]>
   getScanDetail: (scanId: string) => Promise<ScanResult>
-  deleteBackup: (backupIds: string[]) => Promise<void>
+  getSettings: () => Promise<AppSettings>
+  setSettings: (partial: Partial<AppSettings>) => Promise<AppSettings>
+  onMenuStartScan: (callback: () => void) => void
 }
 
 declare global {

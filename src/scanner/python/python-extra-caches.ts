@@ -1,11 +1,8 @@
 import { homedir } from 'os'
 import path from 'path'
-import { exec } from 'child_process'
-import { promisify } from 'util'
 import { BaseScanner } from '../base'
+import { getNamedDirectories } from '../scan-context'
 import type { CacheItem } from '../../shared/types'
-
-const execAsync = promisify(exec)
 
 export class PythonExtraCachesScanner extends BaseScanner {
   id = 'python.extra'
@@ -53,21 +50,16 @@ export class PythonExtraCachesScanner extends BaseScanner {
     }
 
     // 5. __pycache__ directories
-    try {
-      const { stdout } = await execAsync('find ' + home + ' -maxdepth 4 -name __pycache__ -type d 2>/dev/null')
-      const pycacheDirs = stdout.trim().split('\n').filter(Boolean)
-      if (pycacheDirs.length > 0) {
-        let totalPycacheSize = 0
-        for (const dir of pycacheDirs) {
-          totalPycacheSize += await this.getSize(dir)
-        }
-        if (totalPycacheSize > 0) {
-          items.push(this.makeItem('pycache', '__pycache__ 目录', 'Python 字节码缓存文件',
-            pycacheDirs, totalPycacheSize, 'safe', '会在运行 Python 代码时自动重建'))
-        }
+    const pycacheDirs = getNamedDirectories('__pycache__')
+    if (pycacheDirs.length > 0) {
+      let totalPycacheSize = 0
+      for (const dir of pycacheDirs) {
+        totalPycacheSize += await this.getSize(dir)
       }
-    } catch {
-      // find failed — skip
+      if (totalPycacheSize > 0) {
+        items.push(this.makeItem('pycache', '__pycache__ 目录', 'Python 字节码缓存文件',
+          pycacheDirs, totalPycacheSize, 'safe', '会在运行 Python 代码时自动重建'))
+      }
     }
 
     // 6. Jupyter runtime
@@ -84,6 +76,14 @@ export class PythonExtraCachesScanner extends BaseScanner {
     if (ipythonSize > 0) {
       items.push(this.makeItem('ipython-history', 'IPython 历史记录', 'IPython shell 命令历史',
         [ipythonPath], ipythonSize, 'safe', '历史记录会丢失，但功能不受影响'))
+    }
+
+    // 8. pip download cache
+    const pipCachePath = path.join(home, 'Library', 'Caches', 'pip')
+    const pipCacheSize = await this.getSize(pipCachePath)
+    if (pipCacheSize > 0) {
+      items.push(this.makeItem('pip-cache', 'pip 下载缓存', 'pip 缓存的 wheel 和 sdist 文件',
+        [pipCachePath], pipCacheSize, 'safe', 'pip install 自动重新下载'))
     }
 
     return items
